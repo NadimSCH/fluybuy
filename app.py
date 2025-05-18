@@ -6,6 +6,9 @@ from flight_logic import search_all
 
 app = Flask(__name__)
 CORS(app)
+@app.route("/")
+def index():
+    return "🚀 FluyBuy ist live!", 200
 
 @app.route("/search")
 def search_flights():
