@@ -11,26 +11,31 @@ def index():
     return "🚀 FluyBuy ist live!", 200
 
 @app.route("/search")
+@app.route("/search")
 def search_flights():
+    origin       = request.args.get("airport")
+    budget       = int(request.args.get("budget", 200))
     min_days     = int(request.args.get("min_days", 3))
     max_days     = int(request.args.get("max_days", 7))
-    budget       = int(request.args.get("budget", 150))
-    airport      = request.args.get("airport") or None
-    departure_at = request.args.get("departure_at")  # YYYY-MM oder YYYY-MM-DD
+    departure_at = request.args.get("departure_at")
+    hotel_budget = int(request.args.get("hotel_budget", 0))  # 0 = kein Filter
 
-    # Default auf übernächsten Monat, falls nichts angegeben
-    if not departure_at:
-        next_month = (datetime.today().replace(day=1) + timedelta(days=32)).replace(day=1)
-        departure_at = next_month.strftime("%Y-%m")
+    # Dein API-Token für die Hotel-API
+    token = os.getenv("TRAVELPAYOUTS_HOTEL_API_KEY")
 
-    flights = asyncio.run(search_all(
-        origin=airport,
-        budget=budget,
-        min_days=min_days,
-        max_days=max_days,
-        departure_at=departure_at  # immer gesetzt!
-    ))
-    return jsonify(flights)
+    results = asyncio.run(
+        search_flights_with_hotels(
+            origins=[origin] if origin else GERMAN_AIRPORTS,
+            budget=budget,
+            min_days=min_days,
+            max_days=max_days,
+            departure_at=departure_at,
+            hotel_budget=hotel_budget,
+            token=token
+        )
+    )
+
+    return jsonify(results)
 
 if __name__ == "__main__":
     app.run(debug=True)
