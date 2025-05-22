@@ -77,3 +77,42 @@ async def search_travelpayouts_v3(origins, budget, min_days, max_days, departure
         res = await asyncio.gather(*tasks)
     # flattern
     return [f for group in res for f in group]
+
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+HOTELS_TOKEN = os.getenv("HOTELS_API_TOKEN")
+
+async def fetch_hotel(session, location, checkin, checkout, hotel_budget=None):
+    """
+    location: IATA code (or city name)
+    checkin, checkout: strings "YYYY-MM-DD"
+    hotel_budget: optional int, max price in EUR
+    """
+    url = "https://engine.hotellook.com/api/v2/cache.json"
+    params = {
+        "location": location,
+        "checkIn":   checkin,
+        "checkOut":  checkout,
+        "limit":     1,
+        "currency":  "eur",
+        "token":     HOTELS_TOKEN
+    }
+    if hotel_budget:
+        params["max_price"] = hotel_budget
+
+    async with session.get(url, params=params) as resp:
+        data = await resp.json()
+
+    # if no hotel found
+    if not data or "hotelName" not in data:
+        return None
+
+    return {
+        "name":      data.get("hotelName"),
+        "price":     data.get("priceFrom"),
+        "stars":     data.get("stars"),
+        "checkin":   checkin,
+        "checkout":  checkout,
+        "link":      data.get("url") or "",
+    }
+
