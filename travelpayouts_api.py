@@ -80,39 +80,46 @@ async def search_travelpayouts_v3(origins, budget, min_days, max_days, departure
 
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-HOTELS_TOKEN = os.getenv("HOTELS_API_TOKEN")
+HOTELS_TOKEN = os.getenv("TRAVELPAYOUTS_HOTEL_API_KEY")
 
 async def fetch_hotel(session, location, checkin, checkout, hotel_budget=None):
     """
-    location: IATA code (or city name)
-    checkin, checkout: strings "YYYY-MM-DD"
-    hotel_budget: optional int, max price in EUR
+    location: IATA code oder Ortsname
+    checkin, checkout: strings im Format "YYYY-MM-DD"
+    hotel_budget: optional int (max Preis in EUR)
     """
     url = "https://engine.hotellook.com/api/v2/cache.json"
+
+    # alle möglichen Parameter zusammensetzen
     params = {
-        "location": location,
+        "location":  location,
         "checkIn":   checkin,
         "checkOut":  checkout,
         "limit":     1,
         "currency":  "eur",
-        "token":     HOTELS_TOKEN
+        "token":     HOTELS_TOKEN,
     }
-    if hotel_budget:
+    # nur hinzufügen, wenn der User ein Hotel-Budget angegeben hat
+    if hotel_budget is not None and hotel_budget > 0:
         params["max_price"] = hotel_budget
 
-    async with session.get(url, params=params) as resp:
+    # None-Werte rausfiltern (falls noch irgendwo ein None drinsteckt)
+    clean_params = {k: v for k, v in params.items() if v is not None}
+
+    # genau einen Request
+    async with session.get(url, params=clean_params) as resp:
         data = await resp.json()
 
-    # if no hotel found
-    if not data or "hotelName" not in data:
+    # falls keine Daten oder unvollständig
+    if not data or not isinstance(data, list) or len(data) == 0:
         return None
 
+    hotel = data[0]  # das günstigste Ergebnis
     return {
-        "name":      data.get("hotelName"),
-        "price":     data.get("priceFrom"),
-        "stars":     data.get("stars"),
-        "checkin":   checkin,
-        "checkout":  checkout,
-        "link":      data.get("url") or "",
+        "name":     hotel.get("hotelName"),
+        "price":    hotel.get("priceFrom"),
+        "stars":    hotel.get("stars"),
+        "checkin":  checkin,
+        "checkout": checkout,
+        "link":     hotel.get("url", "")
     }
-
